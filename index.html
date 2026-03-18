@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outlook Inbox</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; flex-direction: column; }
+  #signin-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  #signin-screen h1 { font-size: 24px; font-weight: 600; color: #111; }
+  #signin-screen p { font-size: 14px; color: #666; text-align: center; max-width: 320px; line-height: 1.6; }
+  #signin-btn { padding: 12px 28px; background: #0078d4; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+  #signin-btn:hover { background: #106ebe; }
+  #app { display: none; flex: 1; flex-direction: column; height: 100vh; }
+  #topbar { background: #0078d4; color: white; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; }
+  #topbar h1 { font-size: 16px; font-weight: 500; }
+  #topbar-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  #topbar-right button { background: none; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  #topbar-right button:hover { background: rgba(255,255,255,0.15); }
+  #main { display: flex; flex: 1; overflow: hidden; }
+  #sidebar { width: 200px; background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; flex-shrink: 0; }
+  .folder { padding: 10px 16px; font-size: 13px; color: #444; cursor: pointer; display: flex; align-items: center; gap: 8px; border-left: 3px solid transparent; }
+  .folder:hover { background: #f3f4f6; }
+  .folder.active { background: #eff6ff; color: #0078d4; border-left-color: #0078d4; font-weight: 500; }
+  .badge { margin-left: auto; background: #0078d4; color: white; border-radius: 10px; font-size: 10px; padding: 1px 6px; font-weight: 600; }
+  .cat-section { padding: 12px 16px; border-top: 1px solid #e5e7eb; margin-top: 8px; }
+  .cat-section h3 { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .cat-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; margin-bottom: 5px; }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  #email-list { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #e5e7eb; background: white; }
+  #list-header { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+  #list-header span { font-size: 14px; font-weight: 500; color: #111; }
+  #refresh-btn { font-size: 12px; color: #0078d4; cursor: pointer; background: none; border: none; font-family: inherit; }
+  #emails { flex: 1; overflow-y: auto; }
+  .email-item { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+  .email-item:hover { background: #f9fafb; }
+  .email-item.selected { background: #eff6ff; }
+  .email-sender { font-size: 13px; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .email-item.unread .email-sender { font-weight: 600; }
+  .email-subject { font-size: 12px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .email-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .email-date { font-size: 11px; color: #999; }
+  .cat-badge { font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 500; }
+  .cat-urgent { background: #fee2e2; color: #991b1b; }
+  .cat-action { background: #fef3c7; color: #92400e; }
+  .cat-info { background: #dbeafe; color: #1e40af; }
+  .cat-low { background: #f3f4f6; color: #6b7280; }
+  #detail { flex: 1; display: flex; flex-direction: column; background: white; overflow: hidden; }
+  #detail-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px; }
+  #detail-content { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  #detail-header { padding: 20px; border-bottom: 1px solid #e5e7eb; }
+  #detail-subject { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 8px; }
+  #detail-from { font-size: 13px; color: #555; }
+  #detail-from span { color: #111; }
+  #detail-date { font-size: 12px; color: #999; margin-top: 4px; }
+  #detail-body { flex: 1; padding: 20px; overflow-y: auto; font-size: 14px; color: #333; line-height: 1.7; }
+  #detail-body iframe { width: 100%; height: 100%; border: none; }
+  #detail-actions { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; align-items: center; background: #f9fafb; }
+  #detail-actions button { font-size: 13px; padding: 7px 16px; border-radius: 5px; cursor: pointer; border: 1px solid #d1d5db; background: white; color: #333; font-family: inherit; }
+  #detail-actions button:hover { background: #f3f4f6; }
+  #draft-btn { background: #0078d4 !important; color: white !important; border-color: #0078d4 !important; }
+  #draft-btn:hover { background: #106ebe !important; }
+  #generating { font-size: 12px; color: #999; }
+  #draft-area { padding: 16px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; display: none; flex-direction: column; gap: 10px; }
+  #draft-area textarea { width: 100%; height: 130px; font-size: 13px; padding: 10px; border: 1px solid #d1d5db; border-radius: 5px; background: white; color: #333; font-family: inherit; resize: none; line-height: 1.6; }
+  #draft-area textarea:focus { outline: none; border-color: #0078d4; }
+  .draft-actions { display: flex; gap: 8px; }
+  .draft-actions button { font-size: 13px; padding: 7px 16px; border-radius: 5px; cursor: pointer; border: 1px solid #d1d5db; background: white; color: #333; font-family: inherit; }
+  .draft-actions button:hover { background: #f3f4f6; }
+  #send-btn { background: #0078d4 !important; color: white !important; border-color: #0078d4 !important; }
+  #body-loading { padding: 20px; color: #999; font-size: 13px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #0078d4; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="signin-screen">
+  <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" width="56" height="56">
+    <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+    <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+    <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+  </svg>
+  <h1>Outlook Inbox Manager</h1>
+  <p>Sign in with your Microsoft account to review, categorise, and draft AI replies to your emails.</p>
+  <button id="signin-btn">
+    <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+    </svg>
+    Sign in with Microsoft
+  </button>
+  <p style="font-size:12px;color:#aaa;">Your credentials are never stored. Auth via Microsoft OAuth.</p>
+</div>
+
+<div id="app">
+  <div id="topbar">
+    <h1>Outlook Inbox Manager</h1>
+    <div id="topbar-right">
+      <span id="topbar-user"></span>
+      <button onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+  <div id="main">
+    <div id="sidebar">
+      <div style="padding: 8px 0; margin-top: 8px;">
+        <div class="folder active" data-folder="inbox">📥 Inbox <span class="badge" id="unread-badge">0</span></div>
+        <div class="folder" data-folder="sent">📤 Sent</div>
+        <div class="folder" data-folder="drafts">📝 Drafts</div>
+      </div>
+      <div class="cat-section">
+        <h3>Categories</h3>
+        <div class="cat-item"><span class="cat-dot" style="background:#ef4444;"></span> Urgent</div>
+        <div class="cat-item"><span class="cat-dot" style="background:#f59e0b;"></span> Action needed</div>
+        <div class="cat-item"><span class="cat-dot" style="background:#3b82f6;"></span> Info only</div>
+        <div class="cat-item"><span class="cat-dot" style="background:#9ca3af;"></span> Low priority</div>
+      </div>
+    </div>
+
+    <div id="email-list">
+      <div id="list-header">
+        <span id="folder-title">Inbox</span>
+        <button id="refresh-btn">↻ Refresh</button>
+      </div>
+      <div id="emails"></div>
+    </div>
+
+    <div id="detail">
+      <div id="detail-empty">Select an email to read it</div>
+      <div id="detail-content">
+        <div id="detail-header">
+          <div id="detail-subject"></div>
+          <div id="detail-from"></div>
+          <div id="detail-date"></div>
+        </div>
+        <div id="detail-body"></div>
+        <div id="detail-actions">
+          <button id="draft-btn">✦ Draft reply with AI</button>
+          <button id="categorise-btn">Tag category</button>
+          <span id="generating" style="display:none;"><span class="spinner"></span>Generating...</span>
+        </div>
+        <div id="draft-area">
+          <textarea id="draft-text" placeholder="AI-generated draft will appear here..."></textarea>
+          <div class="draft-actions">
+            <button id="send-btn">Send</button>
+            <button id="copy-btn">Copy</button>
+            <button id="regen-btn">Regenerate</button>
+            <button onclick="document.getElementById('draft-area').style.display='none'">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLIENT_ID = 'aa714263-8e85-43b1-93c2-b718ec87d18c';
+const TENANT_ID = 'c716aa32-ec2e-4b65-97b3-97c6bb0dfa1b';
+const REDIRECT_URI = 'https://roballen1.github.io/outlook-app/';
+const SCOPES = 'openid profile email Mail.Read Mail.ReadWrite Mail.Send';
+
+let accessToken = sessionStorage.getItem('ms_token') || null;
+let emails = [], selectedEmail = null, currentFolder = 'inbox';
+let fullBodyCache = {};
+const folderMap = { inbox: 'inbox', sent: 'sentitems', drafts: 'drafts' };
+
+function getAuthUrl() {
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    response_type: 'token',
+    redirect_uri: REDIRECT_URI,
+    scope: SCOPES,
+    response_mode: 'fragment'
+  });
+  return `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?${params}`;
+}
+
+function parseToken() {
+  const hash = new URLSearchParams(window.location.hash.substring(1));
+  const token = hash.get('access_token');
+  if (token) {
+    sessionStorage.setItem('ms_token', token);
+    accessToken = token;
+    history.replaceState(null, '', window.location.pathname);
+    return true;
+  }
+  return false;
+}
+
+function signOut() {
+  sessionStorage.removeItem('ms_token');
+  accessToken = null;
+  fullBodyCache = {};
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('signin-screen').style.display = 'flex';
+}
+
+async function graphGet(path) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (res.status === 401) { signOut(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error(`Graph error: ${res.status}`);
+  return res.json();
+}
+
+async function init() {
+  document.getElementById('signin-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  try {
+    const me = await graphGet('/me');
+    document.getElementById('topbar-user').textContent = me.displayName || me.mail || '';
+  } catch(e) {}
+  loadEmails('inbox');
+}
+
+function categoryFor(e) {
+  const text = ((e.subject || '') + ' ' + (e.bodyPreview || '')).toLowerCase();
+  if (text.match(/urgent|asap|immediately|critical|emergency/)) return 'urgent';
+  if (text.match(/action required|please review|approval|decision|deadline|respond/)) return 'action';
+  if (text.match(/fyi|newsletter|update|notification|no.?reply|noreply|unsubscribe/)) return 'low';
+  return 'info';
+}
+
+function catBadge(cat) {
+  const map = { urgent:['Urgent','cat-urgent'], action:['Action','cat-action'], info:['Info','cat-info'], low:['Low','cat-low'] };
+  const [label, cls] = map[cat] || map.info;
+  return `<span class="cat-badge ${cls}">${label}</span>`;
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str), now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return d.toLocaleDateString([], {month:'short', day:'numeric'});
+}
+
+async function loadEmails(folder) {
+  currentFolder = folder;
+  fullBodyCache = {};
+  document.getElementById('folder-title').textContent = folder.charAt(0).toUpperCase() + folder.slice(1);
+  document.getElementById('emails').innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    const data = await graphGet(`/me/mailFolders/${folderMap[folder]}/messages?$top=25&$select=id,subject,from,receivedDateTime,isRead,bodyPreview`);
+    emails = data.value || [];
+    document.getElementById('unread-badge').textContent = emails.filter(e => !e.isRead).length;
+    renderList();
+  } catch(e) {
+    document.getElementById('emails').innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">Error loading emails</div>';
+  }
+}
+
+function renderList() {
+  const c = document.getElementById('emails');
+  if (!emails.length) { c.innerHTML = '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">No emails found</div>'; return; }
+  c.innerHTML = emails.map((e, i) => {
+    const from = e.from?.emailAddress?.name || e.from?.emailAddress?.address || 'Unknown';
+    return `<div class="email-item ${!e.isRead?'unread':''} ${selectedEmail===i?'selected':''}" onclick="selectEmail(${i})">
+      <div class="email-sender">${from}</div>
+      <div class="email-subject">${e.subject || '(no subject)'}</div>
+      <div class="email-meta"><span class="email-date">${formatDate(e.receivedDateTime)}</span>${catBadge(categoryFor(e))}</div>
+    </div>`;
+  }).join('');
+}
+
+async function selectEmail(i) {
+  selectedEmail = i;
+  renderList();
+  const e = emails[i];
+  document.getElementById('detail-empty').style.display = 'none';
+  document.getElementById('detail-content').style.display = 'flex';
+  document.getElementById('detail-subject').textContent = e.subject || '(no subject)';
+  document.getElementById('detail-from').innerHTML = `From: <span>${e.from?.emailAddress?.name || ''} &lt;${e.from?.emailAddress?.address || ''}&gt;</span>`;
+  document.getElementById('detail-date').textContent = e.receivedDateTime ? new Date(e.receivedDateTime).toLocaleString() : '';
+  document.getElementById('draft-area').style.display = 'none';
+  document.getElementById('draft-text').value = '';
+
+  const bodyEl = document.getElementById('detail-body');
+  bodyEl.innerHTML = '<div id="body-loading"><span class="spinner"></span> Loading full email...</div>';
+
+  try {
+    let fullEmail;
+    if (fullBodyCache[e.id]) {
+      fullEmail = fullBodyCache[e.id];
+    } else {
+      fullEmail = await graphGet(`/me/messages/${e.id}?$select=body,bodyPreview`);
+      fullBodyCache[e.id] = fullEmail;
+    }
+
+    const contentType = fullEmail.body?.contentType;
+    const content = fullEmail.body?.content || e.bodyPreview || '';
+
+    if (contentType === 'html') {
+      // Render HTML emails safely in a sandboxed iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width:100%;height:100%;border:none;flex:1;';
+      iframe.sandbox = 'allow-same-origin';
+      bodyEl.innerHTML = '';
+      bodyEl.style.padding = '0';
+      bodyEl.style.overflow = 'hidden';
+      bodyEl.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(content);
+      iframe.contentDocument.close();
+    } else {
+      bodyEl.style.padding = '20px';
+      bodyEl.style.overflow = 'auto';
+      bodyEl.style.whiteSpace = 'pre-wrap';
+      bodyEl.textContent = content;
+    }
+  } catch(err) {
+    bodyEl.style.padding = '20px';
+    bodyEl.textContent = e.bodyPreview || 'Could not load email body.';
+  }
+}
+
+document.getElementById('draft-btn').onclick = async () => {
+  if (selectedEmail === null) return;
+  const e = emails[selectedEmail];
+  document.getElementById('generating').style.display = 'inline';
+  document.getElementById('draft-area').style.display = 'none';
+
+  // Use cached full body for better AI drafting
+  const cached = fullBodyCache[e.id];
+  let bodyText = e.bodyPreview || '';
+  if (cached?.body?.content) {
+    if (cached.body.contentType === 'html') {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = cached.body.content;
+      bodyText = tmp.innerText || tmp.textContent || bodyText;
+    } else {
+      bodyText = cached.body.content;
+    }
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: `Draft a professional, concise email reply. Output only the reply body text, no subject line, no preamble like "Here is a draft".\n\nFrom: ${e.from?.emailAddress?.name || ''}\nSubject: ${e.subject || ''}\nMessage:\n${bodyText}` }]
+      })
+    });
+    const data = await res.json();
+    document.getElementById('draft-text').value = data.content?.[0]?.text || '';
+    document.getElementById('draft-area').style.display = 'flex';
+  } catch(err) {
+    document.getElementById('draft-text').value = 'Error generating draft. Please try again.';
+    document.getElementById('draft-area').style.display = 'flex';
+  }
+  document.getElementById('generating').style.display = 'none';
+};
+
+document.getElementById('regen-btn').onclick = () => document.getElementById('draft-btn').click();
+
+document.getElementById('copy-btn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('draft-text').value);
+  document.getElementById('copy-btn').textContent = 'Copied!';
+  setTimeout(() => document.getElementById('copy-btn').textContent = 'Copy', 2000);
+};
+
+document.getElementById('send-btn').onclick = async () => {
+  if (selectedEmail === null) return;
+  const e = emails[selectedEmail];
+  const body = document.getElementById('draft-text').value;
+  if (!body.trim()) return;
+  try {
+    const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          subject: `Re: ${e.subject || ''}`,
+          body: { contentType: 'Text', content: body },
+          toRecipients: [{ emailAddress: { address: e.from?.emailAddress?.address, name: e.from?.emailAddress?.name } }]
+        }
+      })
+    });
+    if (res.ok || res.status === 202) {
+      document.getElementById('send-btn').textContent = 'Sent!';
+      document.getElementById('draft-area').style.display = 'none';
+      setTimeout(() => document.getElementById('send-btn').textContent = 'Send', 3000);
+    } else {
+      alert('Failed to send. Please try again.');
+    }
+  } catch(err) { alert('Failed to send. Please try again.'); }
+};
+
+document.getElementById('categorise-btn').onclick = () => {
+  if (selectedEmail === null) return;
+  const labels = { urgent:'Urgent', action:'Action needed', info:'Info only', low:'Low priority' };
+  alert(`Category: ${labels[categoryFor(emails[selectedEmail])]}`);
+};
+
+document.querySelectorAll('.folder').forEach(f => {
+  f.addEventListener('click', () => {
+    document.querySelectorAll('.folder').forEach(x => x.classList.remove('active'));
+    f.classList.add('active');
+    loadEmails(f.dataset.folder);
+  });
+});
+
+document.getElementById('refresh-btn').onclick = () => loadEmails(currentFolder);
+document.getElementById('signin-btn').onclick = () => { window.location.href = getAuthUrl(); };
+
+if (parseToken() || accessToken) {
+  init();
+} else {
+  document.getElementById('signin-screen').style.display = 'flex';
+}
+</script>
+</body>
+</html>
